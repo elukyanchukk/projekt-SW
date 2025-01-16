@@ -14,3 +14,6 @@
 - Analiza tekstu - Analiza sentymentu - stworzyć nową kolumnę, która będzie pokazywać, czy film ma pozytywny, negatywny czy neutralny ton – 10 pkt
 Wychodzi razem 143 punkty, więc po pierwsze jest jeszcze miejsce na to, żeby coś wyrzucić, dwa ostatni punkt to wykresy jeśli wyrzucimy więcej i nam zabraknie można coś z tym wymyślić.
 
+---------------------------------------------------------------------------------------------------------------
+Na mojej gałęzi dodałam plik py, trochę tam zaczęłam coś robić: dodałam filtry i wyszukiwarkę z tf-idf.
+Dodałam też plik csv z rekordami, jest ich więcej niż 10 000 tys, ale trzeba je jeszcze oczyścić, bo nie wiem czy nie ma tam jakiś pustych wierszy i duplikatów

@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
+from sklearn.preprocessing import normalize
+from sklearn.decomposition import TruncatedSVD
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Tytuł aplikacji w lewym górnym rogu
 st.set_page_config(layout="wide")
@@ -49,8 +52,7 @@ try:
         "Wszystkie": (0, movies_df['vote_count'].max()),
         "Niska (do 5)": (0, 4.99),
         "Średnia (5-7.5)": (5, 7.49),
-        "Wysoka (powyżej 7.5)": (7.5, movies_df['vote_count'].max()),
-        # "Bardzo wysoka (powyżej 9)": (9, movies_df['vote_count'].max())
+        "Wysoka (powyżej 7.5)": (7.5, movies_df['vote_count'].max())
     }
 
     filtered_df = movies_df.copy()
@@ -58,9 +60,6 @@ try:
     # TF-IDF
     with st.container():
         search_query = st.text_input("Wpisz swoje zapytanie:", value="")
-        
-        # Copy the main DataFrame for filtering
-        filtered_df = movies_df.copy()
 
     with st.container():
         # Rozkład filtrów w dwóch rzędach po trzy filtry
@@ -104,21 +103,37 @@ try:
             filtered_df = filtered_df[
                 (filtered_df['vote_average'] >= min_votes) & (filtered_df['vote_average'] <= max_votes)].reset_index(drop=True)
 
+    similarity_method = st.radio("Wybierz miarę podobieństwa:", ("Miara cosinusa", "LSI"))
+
+    filtered_df['similarity'] = 0
+
     # Handle TF-IDF and sorting based on search query
     if search_query:
         # Perform TF-IDF only on the filtered DataFrame
         vectorizer = TfidfVectorizer(stop_words='english')
         tfidf_matrix = vectorizer.fit_transform(filtered_df['overview'])
-        query_vector = vectorizer.transform([search_query]).toarray()
-        similarity_scores = tfidf_matrix.toarray() @ query_vector.T
-        similarity_scores = similarity_scores.flatten()
 
-        # Add similarity column and sort by it
-        filtered_df['similarity'] = similarity_scores
+        query_vector = vectorizer.transform([search_query]).toarray()
+
+        tfidf_matrix_normalized = normalize(tfidf_matrix, norm='l2')
+        query_vector_normalized = normalize(query_vector, norm='l2')
+
+        if similarity_method == "Miara cosinusa":
+            # Cosine similarity calculation
+            cosine_similarity_scores = tfidf_matrix_normalized @ query_vector_normalized.T
+            cosine_similarity_scores = cosine_similarity_scores.flatten()
+            filtered_df['similarity'] = cosine_similarity_scores
+
+        elif similarity_method == "LSI":
+            # LSI (Latent Semantic Indexing) using SVD (Singular Value Decomposition)
+            svd = TruncatedSVD(n_components=100, random_state=42)
+            lsi_matrix = svd.fit_transform(tfidf_matrix)
+            query_lsi_vector = svd.transform(query_vector)
+            lsi_similarity_scores = cosine_similarity(lsi_matrix, query_lsi_vector)
+            lsi_similarity_scores = lsi_similarity_scores.flatten()
+            filtered_df['similarity'] = lsi_similarity_scores
+
         filtered_df = filtered_df.sort_values(by='similarity', ascending=False).reset_index(drop=True)
-    else:
-        # If no query, add a default similarity score for consistent display
-        filtered_df['similarity'] = 0
 
     # Wyświetl liczbę wyników
     st.write(f"Znaleziono {len(filtered_df)} filmów.")

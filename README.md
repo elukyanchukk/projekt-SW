@@ -1,3 +1,17 @@
+## Co mamy
+- Aplikacja webowa – biblioteka streamlit – 10 pkt
+- Wielkość i przechowywanie analizowanego zbioru danych – 1.000 – 9.999 – 5 pkt - wyczyściłam duplikaty, więc teraz mamy mniej
+- Dodatkowe unikatowe cechy w zbiorze danych – 6 dodatkowe cechy (razem mamy 16) – 6 pkt - po dodaniu kolumn mamy 16
+- ożliwość wykorzystania filtra - według roku, gatunku, języka, czasu trwania, średnie oceny powyżej jakiegoś poziomu, przychody powyżej jakiegoś progu, ton – 7 pkt
+- generowanie opisu według reguł - 10 pkt
+- nadawanie wag termom - TF-IDF - 10 pkt
+- miary podobieństwa - cosinusa, LSI - 15 pkt
+- Podobieństwo termów – do poprawy błędów – odległość Levensteina – 5 pkt
+- Klasyfikacja dokumentów - KNN - 10 pkt
+- Analiza tekstu - Analiza sentymentu - 10 pkt
+
+**Razem: 88**
+
 ## Kryteria 
 ( tutaj możemy odznaczać co mamy zrobione, też jak wpadną jakieś nowe pomysły, na razie po prostu przekleiłam to co mam w pliku)
 - Aplikacja webowa – biblioteka streamlit – 10 pkt

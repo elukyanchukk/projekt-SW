@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
-from rapidfuzz.distance import Levenshtein
-from textblob import TextBlob
+
+from functions import analyze_sentiment, correct_query, generate_description, preprocess_df, create_knn_model, classify_vote_category
 
 # Tytuł aplikacji
 st.set_page_config(layout="wide")
@@ -22,29 +23,7 @@ try:
     # Wczytaj dane z pliku CSV
     movies_df = pd.read_csv(csv_file_path, low_memory=False, sep=',')
 
-    # Wstępna obróbka danych
-    movies_df['popularity'] = movies_df['popularity'].round(2)
-    movies_df['vote_average'] = movies_df['vote_average'].round(2)
-    movies_df['vote_count'] = movies_df['vote_count'].apply(pd.to_numeric, errors='coerce')
-    movies_df['revenue'] = movies_df['revenue'].apply(pd.to_numeric, errors='coerce')
-    movies_df['runtime'] = movies_df['runtime'].apply(pd.to_numeric, errors='coerce')
-    movies_df.fillna(
-        {'genre': 'Nieznane', 'release_date': 'Brak danych', 'original_language': 'Nieznany', 'overview': 'Brak opisu'},
-        inplace=True)
-
-    # Dodaj kolumnę z rokiem
-    movies_df['release_year'] = movies_df['release_date'].apply(
-        lambda x: x[:4] if isinstance(x, str) and len(x) >= 4 else 'Brak danych')
-
-    # Analiza tonu
-    def analyze_sentiment(text):
-        blob = TextBlob(text)
-        return blob.sentiment.polarity
-
-    movies_df['sentiment'] = movies_df['overview'].apply(analyze_sentiment)
-    movies_df['tone'] = movies_df['sentiment'].apply(
-        lambda x: 'Pozytywny' if x > 0 else 'Negatywny' if x < 0 else 'Neutralny'
-    )
+    movies_df = preprocess_df(movies_df)
 
     filtered_df = movies_df.copy()
 
@@ -74,13 +53,6 @@ try:
 
     # Generowanie słownika poprawnych słów z opisów
     valid_words = set(word.lower() for desc in movies_df['overview'] for word in str(desc).split())
-
-    # Funkcja autokorekty zapytania
-    def correct_query(query, valid_words, threshold=3):
-        distances = [(word, Levenshtein.distance(query.lower(), word.lower())) for word in valid_words]
-        distances.sort(key=lambda x: x[1])
-        best_match, best_distance = distances[0]
-        return best_match if best_distance <= threshold else query
 
     # Wprowadzenie zapytania przez użytkownika
     with st.container():
@@ -145,10 +117,11 @@ try:
         # Autokorekta zawsze działa na zapytaniu
         corrected_query = correct_query(search_query, valid_words)
 
+        vectorizer = TfidfVectorizer(stop_words='english')
+        tfidf_matrix = vectorizer.fit_transform(filtered_df['overview'])
+        query_vector = vectorizer.transform([corrected_query]).toarray()  # Użycie poprawionego zapytania
+
         if similarity_method == "Miara cosinusa":
-            vectorizer = TfidfVectorizer(stop_words='english')
-            tfidf_matrix = vectorizer.fit_transform(filtered_df['overview'])
-            query_vector = vectorizer.transform([corrected_query]).toarray()  # Użycie poprawionego zapytania
             tfidf_matrix_normalized = normalize(tfidf_matrix, norm='l2')
             query_vector_normalized = normalize(query_vector, norm='l2')
             cosine_similarity_scores = tfidf_matrix_normalized @ query_vector_normalized.T
@@ -156,9 +129,6 @@ try:
             filtered_df['similarity'] = cosine_similarity_scores
 
         elif similarity_method == "LSI":
-            vectorizer = TfidfVectorizer(stop_words='english')
-            tfidf_matrix = vectorizer.fit_transform(filtered_df['overview'])
-            query_vector = vectorizer.transform([corrected_query]).toarray()  # Użycie poprawionego zapytania
             svd = TruncatedSVD(n_components=100, random_state=42)
             lsi_matrix = svd.fit_transform(tfidf_matrix)
             query_lsi_vector = svd.transform(query_vector)
@@ -204,35 +174,34 @@ try:
         if selected_movie:
             selected_row = filtered_df[filtered_df['original_title'] == selected_movie].iloc[0]
 
-            def generate_description(movie_row):
-                description = f"Tytuł: {movie_row['original_title']}\n"
-                description += f"Rok wydania: {movie_row['release_year']}\n"
-                if movie_row['tone'] == "Pozytywny":
-                    description += "Opis filmu wskazuje na pozytywny wydźwięk.\n"
-                elif movie_row['tone'] == "Negatywny":
-                    description += "Opis filmu wskazuje na mroczny lub negatywny ton.\n"
-                else:
-                    description += "Opis filmu jest neutralny w tonie.\n"
-
-                if 'runtime' in movie_row and not pd.isna(movie_row['runtime']):
-                    if movie_row['runtime'] < 90:
-                        description += "To krótki film, idealny na szybki seans.\n"
-                    elif movie_row['runtime'] <= 120:
-                        description += "To średniej długości film.\n"
-                    else:
-                        description += "To długi film, oferujący rozbudowaną historię.\n"
-
-                if 'revenue' in movie_row and not pd.isna(movie_row['revenue']):
-                    if movie_row['revenue'] < 1_000_000:
-                        description += "Film wygenerował małe przychody.\n"
-                    elif movie_row['revenue'] <= 100_000_000:
-                        description += "Film osiągnął średnie wyniki finansowe.\n"
-                    else:
-                        description += "Film odniósł ogromny sukces finansowy.\n"
-
-                return description
-
             st.text(generate_description(selected_row))
+
+    # Wprowadzenie informacji o nowym filmie i przewidywanie, czy ocena będzie wysoka, średnia lub niska
+    with st.container(): 
+        st.subheader("Przewidywanie oceny filmu")
+        st.write("Wprowadź informacje o filmie, żeby się dowiedzieć, czy on będzie dobry, średni czy zły")
+
+        title = st.text_input("Tytuł filmu", placeholder="Wprowadź tytuł filmu")
+        overview = st.text_area("Opis filmu", placeholder="Wprowadź szczegółowy opis filmu", height=68)
+
+        classification_df = movies_df[['original_title', 'overview', 'vote_category']]
+
+        model = create_knn_model(classification_df)
+
+        if st.button("Przewiduj kategorię oceny"):
+            predicted_category, nearest_neighbors_df = classify_vote_category(model, title, overview, classification_df)
+            st.write(f"Na podstawie 10 filmów najbardziej podobnych do tego, film najprawdopodobniej będzie **{predicted_category}**.")
+
+            st.dataframe(nearest_neighbors_df[['original_title', 'overview', 'vote_category']].rename(
+                columns ={'original_title': 'Tytuł',
+                          'overview': 'Opis', 
+                          'vote_category': 'Kategoria ocen'
+                          }
+            ),
+                height=400,
+                use_container_width=True
+            )
+
 
 except FileNotFoundError:
     st.error(f"Nie znaleziono pliku CSV pod ścieżką: {csv_file_path}.")

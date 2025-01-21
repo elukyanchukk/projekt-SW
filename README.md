@@ -12,6 +12,8 @@
 
 **Razem: 88**
 
+Dodałam jeszcze jedną miarę odległości (+5 pkt), 2 wykresy dla wyników knn (chmura słów, słupkowy) (+8 pkt)
+
 ## Kryteria 
 ( tutaj możemy odznaczać co mamy zrobione, też jak wpadną jakieś nowe pomysły, na razie po prostu przekleiłam to co mam w pliku)
 - Aplikacja webowa – biblioteka streamlit – 10 pkt

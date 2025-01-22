@@ -13,6 +13,7 @@
 **Razem: 88**
 
 Dodałam jeszcze jedną miarę odległości (+5 pkt), 2 wykresy dla wyników knn (chmura słów, słupkowy) (+8 pkt)
+Natalia: ja spróbuję jeszcze raz pobrać te filmy, żeby było ich więcej i usunąć duplikaty, może wyjdzie te 10 tys. dodatkowo spróbuję umieścić te dane w relacyjnej bazie danych, ale nie wiem czy mi to wyjdzie, więc zobaczymy. (jeśli wyjdzie +13 punktów)
 
 ## Kryteria 
 ( tutaj możemy odznaczać co mamy zrobione, też jak wpadną jakieś nowe pomysły, na razie po prostu przekleiłam to co mam w pliku)

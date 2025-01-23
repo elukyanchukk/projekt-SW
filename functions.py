@@ -6,8 +6,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
+import matplotlib.pyplot as plt
 
-def preprocess_df(movies_df): 
+
+
+def preprocess_df(movies_df):
     # Wstępna obróbka danych
     movies_df['popularity'] = movies_df['popularity'].round(2)
     movies_df['vote_average'] = movies_df['vote_average'].round(2)
@@ -29,7 +32,7 @@ def preprocess_df(movies_df):
 
     movies_df['vote_category'] = pd.qcut(
         movies_df['vote_average'],
-        q=5,  
+        q=5,
         labels=[1, 2, 3, 4, 5]
     )
 
@@ -38,10 +41,12 @@ def preprocess_df(movies_df):
 
     return movies_df
 
+
 # Analiza tonu
 def analyze_sentiment(text):
     blob = TextBlob(text)
     return blob.sentiment.polarity
+
 
 # Funkcja autokorekty zapytania
 def correct_query(query, valid_words, threshold=3):
@@ -49,6 +54,7 @@ def correct_query(query, valid_words, threshold=3):
     distances.sort(key=lambda x: x[1])
     best_match, best_distance = distances[0]
     return best_match if best_distance <= threshold else query
+
 
 # Generowanie opisu
 def generate_description(movie_row):
@@ -79,7 +85,8 @@ def generate_description(movie_row):
 
     return description
 
-def create_knn_model(classification_df): 
+
+def create_knn_model(classification_df):
     classification_df['text'] = classification_df['original_title'] + " " + classification_df['overview']
 
     X = classification_df['text']
@@ -87,32 +94,60 @@ def create_knn_model(classification_df):
 
     model = make_pipeline(
         TfidfVectorizer(),
-        KNeighborsClassifier(n_neighbors=10)  
+        KNeighborsClassifier(n_neighbors=10)
     )
 
     model.fit(X, y)
 
     return model
 
+
 def classify_vote_category(model, user_title, user_overview, classification_df):
     category_mapping = {
-        1: "bardzo zły",    
-        2: "zły", 
+        1: "bardzo zły",
+        2: "zły",
         3: "średni",
-        4: "dobry", 
+        4: "dobry",
         5: "bardzo dobry"
     }
 
     user_text = user_title + " " + user_overview
-    
+
     predicted_numeric_category = model.predict([user_text])[0]
     predicted_category = category_mapping[predicted_numeric_category]
 
     distances, indices = model.named_steps['kneighborsclassifier'].kneighbors(
         model.named_steps['tfidfvectorizer'].transform([user_text]), n_neighbors=10
     )
-    
+
     nearest_neighbors_df = classification_df.iloc[indices[0]].reset_index(drop=True)
     nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping)
-    
+
     return predicted_category, nearest_neighbors_df
+
+def generate_average_rating_trend(filtered_df):
+    # Usuń wartości "Brak danych" i przekonwertuj rok na int
+    trend_data = filtered_df[filtered_df["release_year"] != "Brak"]
+    trend_data["release_year"] = trend_data["release_year"].astype(int)
+
+    # Grupowanie według roku i obliczanie średniej oceny
+    trend_data = (
+        trend_data.groupby("release_year")["vote_average"]
+        .mean()
+        .reset_index()
+        .sort_values("release_year")
+    )
+
+    # Rysowanie wykresu
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(trend_data["release_year"], trend_data["vote_average"], marker="o", linestyle="-", color="orange")
+    ax.set_title("Średnie oceny filmów przez lata", fontsize=16)
+    ax.set_xlabel("Rok wydania", fontsize=12)
+    ax.set_ylabel("Średnia ocena", fontsize=12)
+    ax.grid(True)
+    plt.tight_layout()
+
+    return fig
+
+
+

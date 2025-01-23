@@ -15,6 +15,8 @@
 Dodałam jeszcze jedną miarę odległości (+5 pkt), 2 wykresy dla wyników knn (chmura słów, słupkowy) (+8 pkt)
 Natalia: ja spróbuję jeszcze raz pobrać te filmy, żeby było ich więcej i usunąć duplikaty, może wyjdzie te 10 tys. dodatkowo spróbuję umieścić te dane w relacyjnej bazie danych, ale nie wiem czy mi to wyjdzie, więc zobaczymy. (jeśli wyjdzie +13 punktów) - wydaje mi się, że coś tam się udało zrobić, ale jeszcze muszę trochę z tym popracować, jutro popołudnio wrzucę na gita
 
+update: na razie nie udało mi się jeszcze pobrać więcej tych filmów, zostawiam to jeszcze sobie na weekend. zrobiłam bazę w SQL Lite, zmiany na razie zostawiłam na swojej gałęzi, bo nie wiem czy wszystkie funkcje działają poprawnie. możesz sobie zobaczyć mniej więcej jak to wygląda, wrócę do tego w sobotę. gdybyś robiła jakieś nowe funkcję to pracuj na ty co jest na mainie, później najwyżej złączymy z tym co ja robiłam.
+
 ## Kryteria 
 ( tutaj możemy odznaczać co mamy zrobione, też jak wpadną jakieś nowe pomysły, na razie po prostu przekleiłam to co mam w pliku)
 - Aplikacja webowa – biblioteka streamlit – 10 pkt

@@ -2,10 +2,13 @@ from textblob import TextBlob
 from rapidfuzz.distance import Levenshtein
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import streamlit as st
 
 def preprocess_df(movies_df): 
     # Wstępna obróbka danych
@@ -80,6 +83,7 @@ def generate_description(movie_row):
     return description
 
 def create_knn_model(classification_df): 
+    classification_df = classification_df.copy()
     classification_df['text'] = classification_df['original_title'] + " " + classification_df['overview']
 
     X = classification_df['text']
@@ -116,3 +120,37 @@ def classify_vote_category(model, user_title, user_overview, classification_df):
     nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping)
     
     return predicted_category, nearest_neighbors_df
+
+def create_word_cloud(nearest_neighbors_df): 
+    text_for_wordcloud = " ".join(nearest_neighbors_df['overview'].dropna())
+
+    wordcloud = WordCloud(
+        width=800, 
+        height=400, 
+        background_color='white', 
+        colormap='viridis'
+    ).generate(text_for_wordcloud)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis("off")
+
+    st.pyplot(fig)
+
+def create_bar_chart(nearest_neighbors_df): 
+    vectorizer = CountVectorizer(stop_words='english')
+    X = vectorizer.fit_transform(nearest_neighbors_df['overview'])
+
+    word_counts = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names_out())
+    word_freq = word_counts.sum().sort_values(ascending=False)
+
+    top_10_words = word_freq.head(10)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    top_10_words.plot(kind='bar', color='skyblue', ax=ax)
+    ax.set_xlabel('Words')
+    ax.set_ylabel('Frequency')
+    ax.tick_params(axis='x', rotation=45)
+
+    st.pyplot(fig)

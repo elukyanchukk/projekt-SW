@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import jaccard_score
 
-from functions import analyze_sentiment, correct_query, generate_description, preprocess_df, create_knn_model, classify_vote_category
+from functions import analyze_sentiment, correct_query, generate_description, preprocess_df, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart
 
 # Tytuł aplikacji
 st.set_page_config(layout="wide")
@@ -62,7 +63,7 @@ try:
         if corrected_query != search_query:
             st.info(f"Twoje zapytanie zostało poprawione na: {corrected_query}")
 
-    similarity_method = st.radio("Wybierz miarę podobieństwa:", ("Miara cosinusa", "LSI"))
+    similarity_method = st.radio("Wybierz miarę podobieństwa:", ("Miara cosinusa", "Miara Jaccarda", "LSI"))
 
     # Rozkład filtrów w dwóch rzędach po trzy filtry
     row1_col1, row1_col2, row1_col3 = st.columns(3)
@@ -128,6 +129,17 @@ try:
             cosine_similarity_scores = cosine_similarity_scores.flatten()
             filtered_df['similarity'] = cosine_similarity_scores
 
+        elif similarity_method == "Miara Jaccarda":
+            count_vectorizer = CountVectorizer(binary=True, stop_words='english')
+            binary_matrix = count_vectorizer.fit_transform(filtered_df['overview']).toarray()
+            query_binary_vector = count_vectorizer.transform([corrected_query]).toarray()
+            jaccard_scores = [
+                jaccard_score(binary_matrix[i], query_binary_vector[0], average='binary')
+                for i in range(binary_matrix.shape[0])
+            ]
+
+            filtered_df['similarity'] = jaccard_scores
+
         elif similarity_method == "LSI":
             svd = TruncatedSVD(n_components=100, random_state=42)
             lsi_matrix = svd.fit_transform(tfidf_matrix)
@@ -135,6 +147,7 @@ try:
             lsi_similarity_scores = cosine_similarity(lsi_matrix, query_lsi_vector)
             lsi_similarity_scores = lsi_similarity_scores.flatten()
             filtered_df['similarity'] = lsi_similarity_scores
+
 
         filtered_df = filtered_df.sort_values(by='similarity', ascending=False).reset_index(drop=True)
 
@@ -201,6 +214,17 @@ try:
                 height=400,
                 use_container_width=True
             )
+
+            plot_1, plot_2 = st.columns(2)
+
+            with plot_1:
+                st.write("Chmura słów na podstawie opisów filmów")
+                create_word_cloud(nearest_neighbors_df)
+                
+            with plot_2:
+                st.write("10 najczęściej pojawiających się słów i ich liczba")
+                create_bar_chart(nearest_neighbors_df)
+                
 
 
 except FileNotFoundError:

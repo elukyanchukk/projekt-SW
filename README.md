@@ -5,12 +5,13 @@
 - ożliwość wykorzystania filtra - według roku, gatunku, języka, czasu trwania, średnie oceny powyżej jakiegoś poziomu, przychody powyżej jakiegoś progu, ton – 7 pkt
 - generowanie opisu według reguł - 10 pkt
 - nadawanie wag termom - TF-IDF - 10 pkt
-- miary podobieństwa - cosinusa, LSI - 15 pkt
+- miary podobieństwa - cosinusa, LSI, Jaccarda - 20 pkt
 - Podobieństwo termów – do poprawy błędów – odległość Levensteina – 5 pkt
 - Klasyfikacja dokumentów - KNN - 10 pkt
 - Analiza tekstu - Analiza sentymentu - 10 pkt
+- 2 wykresy - 8 pkt
 
-**Razem: 88**
+**Razem: 101**
 
 Dodałam jeszcze jedną miarę odległości (+5 pkt), 2 wykresy dla wyników knn (chmura słów, słupkowy) (+8 pkt)
 Natalia: ja spróbuję jeszcze raz pobrać te filmy, żeby było ich więcej i usunąć duplikaty, może wyjdzie te 10 tys. dodatkowo spróbuję umieścić te dane w relacyjnej bazie danych, ale nie wiem czy mi to wyjdzie, więc zobaczymy. (jeśli wyjdzie +13 punktów) - wydaje mi się, że coś tam się udało zrobić, ale jeszcze muszę trochę z tym popracować, jutro popołudnio wrzucę na gita

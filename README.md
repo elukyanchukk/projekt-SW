@@ -1,8 +1,9 @@
 ## Co mamy
 - Aplikacja webowa – biblioteka streamlit – 10 pkt
 - Wielkość i przechowywanie analizowanego zbioru danych – 1.000 – 9.999 – 5 pkt - wyczyściłam duplikaty, więc teraz mamy mniej
-- Dodatkowe unikatowe cechy w zbiorze danych – 6 dodatkowe cechy (razem mamy 16) – 6 pkt - po dodaniu kolumn mamy 16
-- ożliwość wykorzystania filtra - według roku, gatunku, języka, czasu trwania, średnie oceny powyżej jakiegoś poziomu, przychody powyżej jakiegoś progu, ton – 7 pkt
+- Przechowywanie wykorzystywanego zbioru danych w relacyjnych bazach danych (SQL Lite) - 10 pkt
+- Dodatkowe unikatowe cechy w zbiorze danych – 6 dodatkowe cechy (razem mamy 16) – 3 pkt - po dodaniu kolumn mamy 16
+- Możliwość wykorzystania filtra - według roku, gatunku, języka, czasu trwania, średnie oceny powyżej jakiegoś poziomu, przychody powyżej jakiegoś progu, ton – 7 pkt
 - generowanie opisu według reguł - 10 pkt
 - nadawanie wag termom - TF-IDF - 10 pkt
 - miary podobieństwa - cosinusa, LSI, Jaccarda - 20 pkt
@@ -11,10 +12,8 @@
 - Analiza tekstu - Analiza sentymentu - 10 pkt
 - 2 wykresy - 8 pkt
 
-**Razem: 101**
-
-Dodałam jeszcze jedną miarę odległości (+5 pkt), 2 wykresy dla wyników knn (chmura słów, słupkowy) (+8 pkt)
-Natalia: ja spróbuję jeszcze raz pobrać te filmy, żeby było ich więcej i usunąć duplikaty, może wyjdzie te 10 tys. dodatkowo spróbuję umieścić te dane w relacyjnej bazie danych, ale nie wiem czy mi to wyjdzie, więc zobaczymy. (jeśli wyjdzie +13 punktów) - wydaje mi się, że coś tam się udało zrobić, ale jeszcze muszę trochę z tym popracować, jutro popołudnio wrzucę na gita
+**Razem: 108**
+tam w dodatkowych cechach miałyśmy 6 pkt, a za każdą dodatkową jest 0.5 pkt, czyli mamy 3 pkt, ja dodałam relacyjną bazę danych
 
 ## Kryteria 
 ( tutaj możemy odznaczać co mamy zrobione, też jak wpadną jakieś nowe pomysły, na razie po prostu przekleiłam to co mam w pliku)

@@ -1,28 +1,26 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
-from rapidfuzz.distance import Levenshtein
-from functions1 import analyze_sentiment, correct_query, generate_description, preprocess_df, create_knn_model, classify_vote_category, generate_average_rating_trend
+from functions import analyze_sentiment, correct_query, generate_description, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart, preprocess_df
+from sklearn.metrics import jaccard_score
 
-
-
-# Konfiguracja strony (MUSI być na samym początku)
+# konfiguracja strony
 st.set_page_config(layout="wide")
 
-
-# Ścieżka do bazy danych SQLite
+# ścieżka do bazy danych SQLite
 DB_PATH = "movies.db"
 
-# Funkcja inicjalizująca bazę danych
 def initialize_database():
+    csv_file_path = "Top_10000_Movies.csv"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Tworzenie tabeli
+
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,36 +40,33 @@ def initialize_database():
             vote_category INTEGER
         )
     """)
-
-    # Sprawdzenie, czy tabela jest pusta
+    # Import danych z CSV, jeśli tabela jest pusta
     cursor.execute("SELECT COUNT(*) FROM movies")
     if cursor.fetchone()[0] == 0:
-        # Wczytanie danych z CSV
-        movies_df = pd.read_csv("Top_10000_Movies.csv", low_memory=False)
+        movies_df = pd.read_csv(csv_file_path, low_memory=False, sep=',')
         movies_df = preprocess_df(movies_df)
         movies_df.to_sql('movies', conn, if_exists='replace', index=False)
+        print("Dane zaimportowane do bazy danych.")
 
     conn.commit()
     conn.close()
 
-# Funkcja pobierająca dane z bazy
+# pobieranie danych z bazy
 def fetch_movies(query="SELECT * FROM movies", params=()):
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query(query, conn, params=params)
     conn.close()
+
+    df['sentiment'] = df['overview'].apply(analyze_sentiment)
+    df['tone'] = df['sentiment'].apply(
+        lambda x: 'Pozytywny' if x > 0 else 'Negatywny' if x < 0 else 'Neutralny'
+    )
+
     return df
 
-# Funkcja autokorekty zapytania
-def correct_query_with_levenshtein(query, valid_words, threshold=3):
-    distances = [(word, Levenshtein.distance(query.lower(), word.lower())) for word in valid_words]
-    distances.sort(key=lambda x: x[1])
-    best_match, best_distance = distances[0]
-    return best_match if best_distance <= threshold else query
-
-# Inicjalizacja bazy danych
 initialize_database()
 
-# Tytuł aplikacji
+# nazwa aplikacji
 
 st.markdown("""
     <div style='background-color: #f5c518; border-radius: 5px; padding: 10px 20px; display: inline-block; text-align: center; margin: 0 auto;margin-bottom: 20px;'>
@@ -81,18 +76,14 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-
-
-
 try:
-    # Pobierz dane z bazy
     movies_df = fetch_movies()
     filtered_df = movies_df.copy()
 
-    # Przygotowanie słownika słów do autokorekty
+
+    # słownik do autokorekty
     valid_words = set(word.lower() for desc in movies_df['overview'] for word in str(desc).split())
 
-    # WYSZUKIWARKA NAD FILTRAMI
     st.markdown("""
         <style>
         /* Stylizacja dla nagłówka "Wyszukiwarka" */
@@ -117,23 +108,23 @@ try:
     """, unsafe_allow_html=True)
 
     search_query = st.text_input("Wpisz swoje zapytanie:", value="")
-    corrected_query = correct_query_with_levenshtein(search_query, valid_words) if search_query else ""
+    corrected_query = correct_query(search_query, valid_words) if search_query else ""
     if corrected_query != search_query:
         st.info(f"Twoje zapytanie zostało poprawione na: {corrected_query}")
 
-    similarity_method = st.radio("Wybierz miarę podobieństwa:", ("Miara cosinusa", "LSI"))
+    similarity_method = st.radio("Wybierz miarę podobieństwa:", ("Miara cosinusa", "LSI", "Miara Jaccarda"))
 
-    # Dodanie domyślnej kolumny 'similarity'
-    filtered_df['similarity'] = 0  # Domyślne wartości, gdy zapytanie jest puste
+    # dodanie kolumny 'similarity'
+    filtered_df['similarity'] = 0  #
 
-    # Obsługa metod podobieństwa
+    # metoda podobieństw
     if search_query:
-        # Autokorekta zawsze działa na zapytaniu
+
         corrected_query = correct_query(search_query, valid_words)
 
         vectorizer = TfidfVectorizer(stop_words='english')
         tfidf_matrix = vectorizer.fit_transform(filtered_df['overview'])
-        query_vector = vectorizer.transform([corrected_query]).toarray()  # Użycie poprawionego zapytania
+        query_vector = vectorizer.transform([corrected_query]).toarray()  #
 
         if similarity_method == "Miara cosinusa":
             tfidf_matrix_normalized = normalize(tfidf_matrix, norm='l2')
@@ -141,6 +132,17 @@ try:
             cosine_similarity_scores = tfidf_matrix_normalized @ query_vector_normalized.T
             cosine_similarity_scores = cosine_similarity_scores.flatten()
             filtered_df['similarity'] = cosine_similarity_scores
+
+        elif similarity_method == "Miara Jaccarda":
+            count_vectorizer = CountVectorizer(binary=True, stop_words='english')
+            binary_matrix = count_vectorizer.fit_transform(filtered_df['overview']).toarray()
+            query_binary_vector = count_vectorizer.transform([corrected_query]).toarray()
+            jaccard_scores = [
+                jaccard_score(binary_matrix[i], query_binary_vector[0], average='binary')
+                for i in range(binary_matrix.shape[0])
+            ]
+
+            filtered_df['similarity'] = jaccard_scores
 
         elif similarity_method == "LSI":
             svd = TruncatedSVD(n_components=100, random_state=42)
@@ -151,7 +153,7 @@ try:
             filtered_df['similarity'] = lsi_similarity_scores
 
         filtered_df = filtered_df.sort_values(by='similarity', ascending=False).reset_index(drop=True)
-    # FILTRY
+
     with st.container():
         st.markdown("""
             <h2 style='
@@ -166,7 +168,7 @@ try:
         row1_col1, row1_col2, row1_col3 = st.columns(3)
         row2_col1, row2_col2, row2_col3 = st.columns(3)
 
-        # Rząd 1
+
         with row1_col1:
             unique_years = sorted(filtered_df['release_year'].unique())
             selected_year = st.selectbox("Wybierz rok premiery:", ["Wszystkie"] + unique_years)
@@ -185,7 +187,6 @@ try:
             if selected_language != "Wszystkie":
                 filtered_df = filtered_df[filtered_df['original_language'] == selected_language].reset_index(drop=True)
 
-        # Rząd 2
         with row2_col1:
             runtime_ranges = {
                 "Wszystkie": (0, movies_df['runtime'].max()),
@@ -221,12 +222,12 @@ try:
             min_vote_avg, max_vote_avg = vote_average_ranges[selected_vote_average_range]
             filtered_df = filtered_df[(filtered_df['vote_average'] >= min_vote_avg) & (filtered_df['vote_average'] <= max_vote_avg)].reset_index(drop=True)
 
-        # Dodanie filtra dla tonu opisu
+
         tone_filter = st.selectbox("Wybierz wydźwięk opisu filmu:", ["Wszystkie", "Pozytywny", "Neutralny", "Negatywny"])
         if tone_filter != "Wszystkie":
             filtered_df = filtered_df[filtered_df['tone'] == tone_filter].reset_index(drop=True)
 
-    # Tabela wyników po filtrach
+    # tabela wyników
     st.markdown("""
         <h2 style='
             width: 100%; 
@@ -257,10 +258,16 @@ try:
         height=400,
         use_container_width=True
     )
-    st.markdown("### Trend średnich ocen filmów przez lata")
-    fig = generate_average_rating_trend(movies_df)
-    st.pyplot(fig)
-
+    st.markdown("""
+        <h2 style='
+            width: 100%; 
+            color: #FFFFFF; /* Kolor tekstu */
+            padding-bottom: 10px; /* Odstęp pomiędzy tekstem a linią */
+            margin-bottom: 20px; /* Odstęp pod całą sekcją */
+            text-align: left;'>
+            Krótki opis filmu
+        </h2>
+    """, unsafe_allow_html=True)
     selected_movie = st.selectbox("Wybierz film do generowania opisu:", filtered_df['original_title'])
     if selected_movie:
         selected_row = filtered_df[filtered_df['original_title'] == selected_movie].iloc[0]
@@ -277,14 +284,56 @@ try:
             Przewidywanie oceny filmu
         </h2>
     """, unsafe_allow_html=True)
-    title = st.text_input("Tytuł filmu")
-    overview = st.text_area("Opis filmu")
-    if st.button("Przewiduj kategorię oceny"):
+
+    # Wprowadzenie tytułu i opisu filmu
+    title = st.text_input("Tytuł filmu", placeholder="Wprowadź tytuł filmu")
+    overview = st.text_area("Opis filmu", placeholder="Wprowadź szczegółowy opis filmu", height=68)
+
+    # Przygotowanie danych i modelu
+    classification_df = movies_df[['original_title', 'overview', 'vote_category']]
+    model = create_knn_model(classification_df)
+
+    # Przycisk przewidywania kategorii ocen
+    if st.button("Przewiduj kategorię oceny", key="predict_button"):
         if title and overview:
-            category = classify_vote_category(title, overview)
-            st.success(f"Przewidywana kategoria oceny: {category}")
+            # Wywołanie funkcji klasyfikacji
+            predicted_category, nearest_neighbors_df = classify_vote_category(model, title, overview, classification_df)
+
+            if isinstance(predicted_category, str) and "Błąd" in predicted_category:
+                st.error(predicted_category)  # Obsługa błędów
+            else:
+                # Wyświetlenie wyniku
+                st.write(
+                    f"Na podstawie 10 filmów najbardziej podobnych do tego, film najprawdopodobniej będzie **{predicted_category}**."
+                )
+
+                # Wyświetlenie tabeli sąsiadów
+                st.dataframe(
+                    nearest_neighbors_df[['original_title', 'overview', 'vote_category']].rename(
+                        columns={
+                            'original_title': 'Tytuł',
+                            'overview': 'Opis',
+                            'vote_category': 'Kategoria ocen'
+                        }
+                    ),
+                    height=400,
+                    use_container_width=True
+                )
+
+                # Wizualizacje: chmura słów i wykres słupkowy
+                plot_1, plot_2 = st.columns(2)
+
+                with plot_1:
+                    st.write("Chmura słów na podstawie opisów filmów")
+                    create_word_cloud(nearest_neighbors_df)
+
+                with plot_2:
+                    st.write("10 najczęściej pojawiających się słów i ich liczba")
+                    create_bar_chart(nearest_neighbors_df)
         else:
             st.error("Proszę wypełnić wszystkie pola!")
+
+
 
 except Exception as e:
     st.error(f"Wystąpił błąd: {e}")

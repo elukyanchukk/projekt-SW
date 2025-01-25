@@ -1,14 +1,12 @@
 from textblob import TextBlob
 from rapidfuzz.distance import Levenshtein
 import pandas as pd
-import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
+from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-
-
+import streamlit as st
 
 def preprocess_df(movies_df):
     # Wstępna obróbka danych
@@ -41,14 +39,13 @@ def preprocess_df(movies_df):
 
     return movies_df
 
-
-# Analiza tonu
+# analiza sentymentu
 def analyze_sentiment(text):
     blob = TextBlob(text)
     return blob.sentiment.polarity
 
 
-# Funkcja autokorekty zapytania
+# odległość levenshteina - autokorekta
 def correct_query(query, valid_words, threshold=3):
     distances = [(word, Levenshtein.distance(query.lower(), word.lower())) for word in valid_words]
     distances.sort(key=lambda x: x[1])
@@ -56,7 +53,7 @@ def correct_query(query, valid_words, threshold=3):
     return best_match if best_distance <= threshold else query
 
 
-# Generowanie opisu
+# generowanie krótkiego opisu
 def generate_description(movie_row):
     description = f"Tytuł: {movie_row['original_title']}\n"
     description += f"Rok wydania: {movie_row['release_year']}\n"
@@ -85,8 +82,8 @@ def generate_description(movie_row):
 
     return description
 
-
 def create_knn_model(classification_df):
+    classification_df = classification_df.copy()
     classification_df['text'] = classification_df['original_title'] + " " + classification_df['overview']
 
     X = classification_df['text']
@@ -102,6 +99,8 @@ def create_knn_model(classification_df):
     return model
 
 
+
+# klasyfikacja dokumentów - knn
 def classify_vote_category(model, user_title, user_overview, classification_df):
     category_mapping = {
         1: "bardzo zły",
@@ -113,41 +112,63 @@ def classify_vote_category(model, user_title, user_overview, classification_df):
 
     user_text = user_title + " " + user_overview
 
-    predicted_numeric_category = model.predict([user_text])[0]
-    predicted_category = category_mapping[predicted_numeric_category]
+    try:
+        predicted_numeric_category = model.predict([user_text])[0]
+        predicted_numeric_category = int(predicted_numeric_category)
 
-    distances, indices = model.named_steps['kneighborsclassifier'].kneighbors(
-        model.named_steps['tfidfvectorizer'].transform([user_text]), n_neighbors=10
-    )
+        predicted_category = category_mapping[predicted_numeric_category]
 
-    nearest_neighbors_df = classification_df.iloc[indices[0]].reset_index(drop=True)
-    nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping)
+        distances, indices = model.named_steps['kneighborsclassifier'].kneighbors(
+            model.named_steps['tfidfvectorizer'].transform([user_text]), n_neighbors=10
+        )
 
-    return predicted_category, nearest_neighbors_df
+        nearest_neighbors_df = classification_df.iloc[indices[0]].reset_index(drop=True)
+        nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].astype(int)
 
-def generate_average_rating_trend(filtered_df):
-    # Usuń wartości "Brak danych" i przekonwertuj rok na int
-    trend_data = filtered_df[filtered_df["release_year"] != "Brak"]
-    trend_data["release_year"] = trend_data["release_year"].astype(int)
+        nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping).fillna("Nieznana kategoria")
 
-    # Grupowanie według roku i obliczanie średniej oceny
-    trend_data = (
-        trend_data.groupby("release_year")["vote_average"]
-        .mean()
-        .reset_index()
-        .sort_values("release_year")
-    )
+        return predicted_category, nearest_neighbors_df
+    except Exception as e:
+        return f"Błąd podczas klasyfikacji: {e}", pd.DataFrame()
 
-    # Rysowanie wykresu
+
+
+# chmura słów
+def create_word_cloud(nearest_neighbors_df):
+    text_for_wordcloud = " ".join(nearest_neighbors_df['overview'].dropna())
+
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color='white',
+        colormap='viridis'
+    ).generate(text_for_wordcloud)
+
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(trend_data["release_year"], trend_data["vote_average"], marker="o", linestyle="-", color="orange")
-    ax.set_title("Średnie oceny filmów przez lata", fontsize=16)
-    ax.set_xlabel("Rok wydania", fontsize=12)
-    ax.set_ylabel("Średnia ocena", fontsize=12)
-    ax.grid(True)
-    plt.tight_layout()
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis("off")
 
-    return fig
+    st.pyplot(fig)
+
+# słupkowy
+def create_bar_chart(nearest_neighbors_df):
+    vectorizer = CountVectorizer(stop_words='english')
+    X = vectorizer.fit_transform(nearest_neighbors_df['overview'])
+
+    word_counts = pd.DataFrame(X.toarray(), columns=vectorizer.get_feature_names_out())
+    word_freq = word_counts.sum().sort_values(ascending=False)
+
+    top_10_words = word_freq.head(10)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    top_10_words.plot(kind='bar', color='skyblue', ax=ax)
+    ax.set_xlabel('Words')
+    ax.set_ylabel('Frequency')
+    ax.tick_params(axis='x', rotation=45)
+
+    st.pyplot(fig)
+
 
 
 

@@ -20,7 +20,6 @@ def initialize_database():
     cursor = conn.cursor()
 
 
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

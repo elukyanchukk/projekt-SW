@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
-from functions import analyze_sentiment, correct_query, generate_description, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart, preprocess_df
+from functions1 import analyze_sentiment, correct_query, generate_description, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart, create_svm_model
 from sklearn.metrics import jaccard_score
 
 # konfiguracja strony
@@ -15,10 +15,8 @@ st.set_page_config(layout="wide")
 DB_PATH = "movies.db"
 
 def initialize_database():
-    csv_file_path = "Top_10000_Movies.csv"
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS movies (
@@ -39,13 +37,6 @@ def initialize_database():
             vote_category INTEGER
         )
     """)
-    # Import danych z CSV, jeśli tabela jest pusta
-    cursor.execute("SELECT COUNT(*) FROM movies")
-    if cursor.fetchone()[0] == 0:
-        movies_df = pd.read_csv(csv_file_path, low_memory=False, sep=',')
-        movies_df = preprocess_df(movies_df)
-        movies_df.to_sql('movies', conn, if_exists='replace', index=False)
-        print("Dane zaimportowane do bazy danych.")
 
     conn.commit()
     conn.close()
@@ -272,7 +263,7 @@ try:
         selected_row = filtered_df[filtered_df['original_title'] == selected_movie].iloc[0]
         st.text(generate_description(selected_row))
 
-    # Sekcja przewidywania kategorii ocen
+    # Sekcja przewidywania kategorii ocen filmu
     st.markdown("""
         <h2 style='
             width: 100%; 
@@ -288,25 +279,29 @@ try:
     title = st.text_input("Tytuł filmu", placeholder="Wprowadź tytuł filmu")
     overview = st.text_area("Opis filmu", placeholder="Wprowadź szczegółowy opis filmu", height=68)
 
-    # Przygotowanie danych i modelu
+    # Przygotowanie danych i modeli
     classification_df = movies_df[['original_title', 'overview', 'vote_category']]
-    model = create_knn_model(classification_df)
+    knn_model = create_knn_model(classification_df)
+    svm_model = create_svm_model(classification_df)
+
+    # Wybór metody klasyfikacji
+    classification_method = st.radio(
+        "Wybierz metodę klasyfikacji:",
+        ("KNN", "SVM")
+    )
 
     # Przycisk przewidywania kategorii ocen
     if st.button("Przewiduj kategorię oceny", key="predict_button"):
         if title and overview:
-            # Wywołanie funkcji klasyfikacji
-            predicted_category, nearest_neighbors_df = classify_vote_category(model, title, overview, classification_df)
+            # Wywołanie odpowiedniej metody klasyfikacji
+            if classification_method == "KNN":
+                predicted_category, nearest_neighbors_df = classify_vote_category(knn_model, title, overview,
+                                                                                  classification_df)
 
-            if isinstance(predicted_category, str) and "Błąd" in predicted_category:
-                st.error(predicted_category)  # Obsługa błędów
-            else:
-                # Wyświetlenie wyniku
+                # Wyświetlanie wyników dla KNN
                 st.write(
                     f"Na podstawie 10 filmów najbardziej podobnych do tego, film najprawdopodobniej będzie **{predicted_category}**."
                 )
-
-                # Wyświetlenie tabeli sąsiadów
                 st.dataframe(
                     nearest_neighbors_df[['original_title', 'overview', 'vote_category']].rename(
                         columns={
@@ -329,10 +324,13 @@ try:
                 with plot_2:
                     st.write("10 najczęściej pojawiających się słów i ich liczba")
                     create_bar_chart(nearest_neighbors_df)
+
+            elif classification_method == "SVM":
+                predicted_category, _ = classify_vote_category(svm_model, title, overview, classification_df)
+
+                # Wyświetlanie wyników dla SVM
+                st.write(f"Film najprawdopodobniej będzie w kategorii **{predicted_category}**.")
         else:
             st.error("Proszę wypełnić wszystkie pola!")
-
-
-
 except Exception as e:
-    st.error(f"Wystąpił błąd: {e}")
+    st.error(f"Wystąpił błąd podczas przetwarzania danych: {e}")

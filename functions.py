@@ -7,6 +7,8 @@ from sklearn.pipeline import make_pipeline
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import streamlit as st
+from sklearn.svm import LinearSVC
+from sklearn.pipeline import make_pipeline
 
 def preprocess_df(movies_df):
     # Wstępna obróbka danych
@@ -169,6 +171,28 @@ def create_bar_chart(nearest_neighbors_df):
 
     st.pyplot(fig)
 
+def create_svm_model(classification_df):
+    classification_df['text'] = classification_df['original_title'] + " " + classification_df['overview']
+    X = classification_df['text']
+    y = classification_df['vote_category']
 
+    model = make_pipeline(TfidfVectorizer(), LinearSVC())
+    model.fit(X, y)
+    return model
 
+def classify_vote_category(model, title, overview, classification_df):
+    text = title + " " + overview
+    vector = model.named_steps['tfidfvectorizer'].transform([text])
 
+    if isinstance(model.named_steps['linearsvc'], LinearSVC):
+        # Obsługa SVM
+        predicted_category = model.named_steps['linearsvc'].predict(vector)[0]
+        return predicted_category, None
+    elif hasattr(model, 'kneighbors'):
+        # Obsługa KNN
+        neighbors = model.kneighbors(vector, return_distance=False)
+        nearest_neighbors_df = classification_df.iloc[neighbors.flatten()]
+        predicted_category = nearest_neighbors_df['vote_category'].mode()[0]
+        return predicted_category, nearest_neighbors_df
+    else:
+        raise ValueError("Nieobsługiwany typ modelu")

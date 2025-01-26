@@ -1,60 +1,19 @@
 import streamlit as st
-import pandas as pd
-import sqlite3
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from sklearn.preprocessing import normalize
-from sklearn.decomposition import TruncatedSVD
-from sklearn.metrics.pairwise import cosine_similarity
-from functions import analyze_sentiment, correct_query, generate_description, create_knn_model,classify_with_knn, classify_with_svm, create_word_cloud, create_bar_chart, create_svm_model
-from sklearn.metrics import jaccard_score
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+import functions.db_functions as db
+import functions.text_functions as txt
+import functions.similarity_functions as sim
+import functions.classification_functions as clf
+import functions.plot_functions as plt
+
 
 # konfiguracja strony
 st.set_page_config(layout="wide")
 
 # ścieżka do bazy danych SQLite
-DB_PATH = "movies.db"
 
-def initialize_database():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS movies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            original_title TEXT,
-            popularity REAL,
-            vote_average REAL,
-            vote_count INTEGER,
-            revenue REAL,
-            runtime REAL,
-            genre TEXT,
-            release_date TEXT,
-            original_language TEXT,
-            overview TEXT,
-            release_year TEXT,
-            sentiment REAL,
-            tone TEXT,
-            vote_category INTEGER
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-# pobieranie danych z bazy
-def fetch_movies(query="SELECT * FROM movies", params=()):
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(query, conn, params=params)
-    conn.close()
-
-    df['sentiment'] = df['overview'].apply(analyze_sentiment)
-    df['tone'] = df['sentiment'].apply(
-        lambda x: 'Pozytywny' if x > 0 else 'Negatywny' if x < 0 else 'Neutralny'
-    )
-
-    return df
-
-initialize_database()
+db.initialize_database()
 
 # nazwa aplikacji
 
@@ -67,9 +26,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 try:
-    movies_df = fetch_movies()
+    movies_df = db.fetch_movies()
     filtered_df = movies_df.copy()
-
 
     # słownik do autokorekty
     valid_words = set(word.lower() for desc in movies_df['overview'] for word in str(desc).split())
@@ -98,48 +56,35 @@ try:
     """, unsafe_allow_html=True)
 
     search_query = st.text_input("Wpisz swoje zapytanie:", value="")
-    corrected_query = correct_query(search_query, valid_words) if search_query else ""
+    corrected_query = txt.correct_query(search_query, valid_words) if search_query else ""
+
     if corrected_query != search_query:
         st.info(f"Twoje zapytanie zostało poprawione na: {corrected_query}")
 
     similarity_method = st.radio("Wybierz miarę podobieństwa:", ("Miara cosinusa", "LSI", "Miara Jaccarda"))
 
     # dodanie kolumny 'similarity'
-    filtered_df['similarity'] = 0  #
+    filtered_df['similarity'] = 0  
 
     # metoda podobieństw
     if search_query:
 
-        corrected_query = correct_query(search_query, valid_words)
+        corrected_query = txt.correct_query(search_query, valid_words)
 
-        vectorizer = TfidfVectorizer(stop_words='english')
+        vectorizer = TfidfVectorizer(stop_words='english', preprocessor=txt.preprocess_text)
         tfidf_matrix = vectorizer.fit_transform(filtered_df['overview'])
-        query_vector = vectorizer.transform([corrected_query]).toarray()  #
+        query_vector = vectorizer.transform([corrected_query]).toarray()  
 
         if similarity_method == "Miara cosinusa":
-            tfidf_matrix_normalized = normalize(tfidf_matrix, norm='l2')
-            query_vector_normalized = normalize(query_vector, norm='l2')
-            cosine_similarity_scores = tfidf_matrix_normalized @ query_vector_normalized.T
-            cosine_similarity_scores = cosine_similarity_scores.flatten()
+            cosine_similarity_scores = sim.cosine(tfidf_matrix, query_vector)
             filtered_df['similarity'] = cosine_similarity_scores
 
         elif similarity_method == "Miara Jaccarda":
-            count_vectorizer = CountVectorizer(binary=True, stop_words='english')
-            binary_matrix = count_vectorizer.fit_transform(filtered_df['overview']).toarray()
-            query_binary_vector = count_vectorizer.transform([corrected_query]).toarray()
-            jaccard_scores = [
-                jaccard_score(binary_matrix[i], query_binary_vector[0], average='binary')
-                for i in range(binary_matrix.shape[0])
-            ]
-
+            jaccard_scores = sim.jaccard(filtered_df, corrected_query)
             filtered_df['similarity'] = jaccard_scores
 
         elif similarity_method == "LSI":
-            svd = TruncatedSVD(n_components=100, random_state=42)
-            lsi_matrix = svd.fit_transform(tfidf_matrix)
-            query_lsi_vector = svd.transform(query_vector)
-            lsi_similarity_scores = cosine_similarity(lsi_matrix, query_lsi_vector)
-            lsi_similarity_scores = lsi_similarity_scores.flatten()
+            lsi_similarity_scores = sim.lsi(tfidf_matrix, query_vector)
             filtered_df['similarity'] = lsi_similarity_scores
 
         filtered_df = filtered_df.sort_values(by='similarity', ascending=False).reset_index(drop=True)
@@ -268,7 +213,7 @@ try:
     selected_movie = st.selectbox("Wybierz film do generowania opisu:", filtered_df['original_title'])
     if selected_movie:
         selected_row = filtered_df[filtered_df['original_title'] == selected_movie].iloc[0]
-        st.text(generate_description(selected_row))
+        st.text(txt.generate_description(selected_row))
 
     # Sekcja przewidywania kategorii ocen filmu
     st.markdown("""
@@ -288,8 +233,8 @@ try:
 
     # Przygotowanie danych i modeli
     classification_df = movies_df[['original_title', 'overview', 'vote_category']]
-    knn_model = create_knn_model(classification_df)
-    svm_model = create_svm_model(classification_df)
+    knn_model = clf.create_knn_model(classification_df)
+    svm_model = clf.create_svm_model(classification_df)
 
     # Wybór metody klasyfikacji
     classification_method = st.radio(
@@ -298,12 +243,11 @@ try:
     )
 
     # Przycisk przewidywania kategorii ocen
-    # Przycisk przewidywania kategorii ocen
     if st.button("Przewiduj kategorię oceny", key="predict_button"):
         if title and overview:
             # Wywołanie odpowiedniej metody klasyfikacji
             if classification_method == "KNN":
-                predicted_category, nearest_neighbors_df = classify_with_knn(knn_model, title, overview,
+                predicted_category, nearest_neighbors_df = clf.classify_with_knn(knn_model, title, overview,
                                                                              classification_df)
 
                 # Wyświetlanie wyników dla KNN
@@ -327,14 +271,14 @@ try:
 
                 with plot_1:
                     st.write("Chmura słów na podstawie opisów filmów")
-                    create_word_cloud(nearest_neighbors_df)
+                    plt.create_word_cloud(nearest_neighbors_df)
 
                 with plot_2:
                     st.write("10 najczęściej pojawiających się słów i ich liczba")
-                    create_bar_chart(nearest_neighbors_df)
+                    plt.create_bar_chart(nearest_neighbors_df)
 
             elif classification_method == "SVM":
-                predicted_category = classify_with_svm(svm_model, title, overview)
+                predicted_category = clf.classify_with_svm(svm_model, title, overview)
 
                 # Wyświetlanie wyników dla SVM
                 st.write(f"Film najprawdopodobniej będzie w kategorii **{predicted_category}**.")

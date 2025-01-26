@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
-from functions1 import analyze_sentiment, correct_query, generate_description, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart, create_svm_model
+from functions import analyze_sentiment, correct_query, generate_description, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart, create_svm_model
 from sklearn.metrics import jaccard_score
 
 # konfiguracja strony
@@ -230,18 +230,24 @@ try:
     """, unsafe_allow_html=True)
     st.write(f"Znaleziono {len(filtered_df)} filmów.")
     st.dataframe(
-        filtered_df[['similarity', 'original_title', 'original_language', 'release_date', 'vote_average', 'popularity', 'runtime', 'revenue', 'genre', 'overview', 'tone']].rename(
+        filtered_df[['similarity','id', 'original_title', 'original_language', 'release_date','release_year',
+                     'vote_average','vote_count', 'popularity', 'runtime', 'revenue', 'genre', 'overview',
+                      'tagline', 'tone']].rename(
             columns={
                 'similarity': 'Podobieństwo',
+                'id': 'ID',
                 'original_title': 'Tytuł',
                 'original_language': 'Język',
                 'release_date': 'Data premiery',
+                'release_year': 'Rok premiery',
                 'vote_average': 'Średnia ocen',
+                'vote_count': 'Liczba głosów',
                 'popularity': 'Popularność',
                 'runtime': 'Czas trwania [min]',
                 'revenue': 'Przychód [mln]',
                 'genre': 'Gatunek',
                 'overview': 'Opis',
+                'tagline': 'Tagline',
                 'tone': 'Wydźwięk'
             }
         ),

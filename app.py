@@ -199,7 +199,8 @@ try:
             }
             selected_revenue_range = st.selectbox("Wybierz zakres przychodu:", list(revenue_ranges.keys()))
             min_revenue, max_revenue = revenue_ranges[selected_revenue_range]
-            filtered_df = filtered_df[(filtered_df['revenue'] >= min_revenue) & (filtered_df['revenue'] <= max_revenue)].reset_index(drop=True)
+            filtered_df = filtered_df[(filtered_df['revenue'] >= min_revenue) &
+                                      (filtered_df['revenue'] <= max_revenue)].reset_index(drop=True)
 
         with row2_col3:
             vote_average_ranges = {

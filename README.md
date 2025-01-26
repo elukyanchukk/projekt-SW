@@ -11,9 +11,12 @@
 - Klasyfikacja dokumentów - KNN - 10 pkt
 - Analiza tekstu - Analiza sentymentu - 10 pkt
 - 2 wykresy - 8 pkt
+- **dodałam SVM - jak twoim zdaniem będzie to spoko to mamy 118 punktów**
 
 **Razem: 108**
+
 tam w dodatkowych cechach miałyśmy 6 pkt, a za każdą dodatkową jest 0.5 pkt, czyli mamy 3 pkt, ja dodałam relacyjną bazę danych
+
 
 ## Kryteria 
 ( tutaj możemy odznaczać co mamy zrobione, też jak wpadną jakieś nowe pomysły, na razie po prostu przekleiłam to co mam w pliku)

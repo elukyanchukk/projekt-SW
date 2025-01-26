@@ -161,7 +161,7 @@ def create_word_cloud(nearest_neighbors_df):
         width=800,
         height=400,
         background_color='white',
-        colormap='viridis'
+        colormap='Wistia'
     ).generate(text_for_wordcloud)
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -182,7 +182,7 @@ def create_bar_chart(nearest_neighbors_df):
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    top_10_words.plot(kind='bar', color='skyblue', ax=ax)
+    top_10_words.plot(kind='bar', color=(0.96, 0.77, 0.09), ax=ax)
     ax.set_xlabel('Words')
     ax.set_ylabel('Frequency')
     ax.tick_params(axis='x', rotation=45)

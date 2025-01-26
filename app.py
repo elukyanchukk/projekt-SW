@@ -5,7 +5,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
-from functions import analyze_sentiment, correct_query, generate_description, create_knn_model, classify_vote_category, create_word_cloud, create_bar_chart, create_svm_model
+from functions import analyze_sentiment, correct_query, generate_description, create_knn_model,classify_with_knn, classify_with_svm, create_word_cloud, create_bar_chart, create_svm_model
 from sklearn.metrics import jaccard_score
 
 # konfiguracja strony
@@ -298,12 +298,13 @@ try:
     )
 
     # Przycisk przewidywania kategorii ocen
+    # Przycisk przewidywania kategorii ocen
     if st.button("Przewiduj kategorię oceny", key="predict_button"):
         if title and overview:
             # Wywołanie odpowiedniej metody klasyfikacji
             if classification_method == "KNN":
-                predicted_category, nearest_neighbors_df = classify_vote_category(knn_model, title, overview,
-                                                                                  classification_df)
+                predicted_category, nearest_neighbors_df = classify_with_knn(knn_model, title, overview,
+                                                                             classification_df)
 
                 # Wyświetlanie wyników dla KNN
                 st.write(
@@ -333,11 +334,12 @@ try:
                     create_bar_chart(nearest_neighbors_df)
 
             elif classification_method == "SVM":
-                predicted_category, _ = classify_vote_category(svm_model, title, overview, classification_df)
+                predicted_category = classify_with_svm(svm_model, title, overview)
 
                 # Wyświetlanie wyników dla SVM
                 st.write(f"Film najprawdopodobniej będzie w kategorii **{predicted_category}**.")
         else:
             st.error("Proszę wypełnić wszystkie pola!")
+
 except Exception as e:
     st.error(f"Wystąpił błąd podczas przetwarzania danych: {e}")

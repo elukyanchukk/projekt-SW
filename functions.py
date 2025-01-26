@@ -103,7 +103,15 @@ def create_knn_model(classification_df):
 
 
 # klasyfikacja dokumentów - knn
-def classify_vote_category(model, user_title, user_overview, classification_df):
+def classify_with_knn(model, title, overview, classification_df):
+    text = title + " " + overview
+    vector = model.named_steps['tfidfvectorizer'].transform([text])
+
+    # Pobranie sąsiadów
+    distances, indices = model.named_steps['kneighborsclassifier'].kneighbors(vector, return_distance=True)
+    nearest_neighbors_df = classification_df.iloc[indices[0]].reset_index(drop=True)
+
+    # Mapowanie kategorii
     category_mapping = {
         1: "bardzo zły",
         2: "zły",
@@ -111,28 +119,38 @@ def classify_vote_category(model, user_title, user_overview, classification_df):
         4: "dobry",
         5: "bardzo dobry"
     }
+    nearest_neighbors_df['vote_category'] = pd.to_numeric(nearest_neighbors_df['vote_category'], errors='coerce')
+    nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping).fillna("Nieznana kategoria")
 
-    user_text = user_title + " " + user_overview
+    # Predykcja na podstawie sąsiadów
+    predicted_category = nearest_neighbors_df['vote_category'].mode()[0]
+    return predicted_category, nearest_neighbors_df
 
-    try:
-        predicted_numeric_category = model.predict([user_text])[0]
-        predicted_numeric_category = int(predicted_numeric_category)
+def classify_with_svm(model, title, overview):
+    text = title + " " + overview
+    vector = model.named_steps['tfidfvectorizer'].transform([text])
 
-        predicted_category = category_mapping[predicted_numeric_category]
+    # Predykcja SVM
+    predicted_category = model.named_steps['linearsvc'].predict(vector)[0]
 
-        distances, indices = model.named_steps['kneighborsclassifier'].kneighbors(
-            model.named_steps['tfidfvectorizer'].transform([user_text]), n_neighbors=10
-        )
+    # Debugowanie - wyświetlenie surowej wartości zwróconej przez SVM
+    print(f"Predykcja zwrócona przez SVM (przed mapowaniem): {predicted_category}")
+    print(f"Typ danych predykcji: {type(predicted_category)}")
 
-        nearest_neighbors_df = classification_df.iloc[indices[0]].reset_index(drop=True)
-        nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].astype(int)
+    # Konwersja na int, jeśli jest to string
+    if isinstance(predicted_category, str):
+        predicted_category = int(predicted_category)
 
-        nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping).fillna("Nieznana kategoria")
-
-        return predicted_category, nearest_neighbors_df
-    except Exception as e:
-        return f"Błąd podczas klasyfikacji: {e}", pd.DataFrame()
-
+    # Mapowanie kategorii
+    category_mapping = {
+        1: "bardzo zły",
+        2: "zły",
+        3: "średni",
+        4: "dobry",
+        5: "bardzo dobry"
+    }
+    predicted_category = category_mapping.get(predicted_category, "Nieznana kategoria")
+    return predicted_category
 
 
 # chmura słów
@@ -180,19 +198,4 @@ def create_svm_model(classification_df):
     model.fit(X, y)
     return model
 
-def classify_vote_category(model, title, overview, classification_df):
-    text = title + " " + overview
-    vector = model.named_steps['tfidfvectorizer'].transform([text])
 
-    if isinstance(model.named_steps['linearsvc'], LinearSVC):
-        # Obsługa SVM
-        predicted_category = model.named_steps['linearsvc'].predict(vector)[0]
-        return predicted_category, None
-    elif hasattr(model, 'kneighbors'):
-        # Obsługa KNN
-        neighbors = model.kneighbors(vector, return_distance=False)
-        nearest_neighbors_df = classification_df.iloc[neighbors.flatten()]
-        predicted_category = nearest_neighbors_df['vote_category'].mode()[0]
-        return predicted_category, nearest_neighbors_df
-    else:
-        raise ValueError("Nieobsługiwany typ modelu")

@@ -1,6 +1,5 @@
 import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
-
 import functions.db_functions as db
 import functions.text_functions as txt
 import functions.similarity_functions as sim
@@ -215,7 +214,7 @@ try:
         selected_row = filtered_df[filtered_df['original_title'] == selected_movie].iloc[0]
         st.text(txt.generate_description(selected_row))
 
-    # Sekcja przewidywania kategorii ocen filmu
+    # sekcja przewidywania kategorii ocen filmu
     st.markdown("""
         <h2 style='
             width: 100%; 
@@ -227,30 +226,29 @@ try:
         </h2>
     """, unsafe_allow_html=True)
 
-    # Wprowadzenie tytułu i opisu filmu
+    # wprowadzenie tytułu i opisu filmu
     title = st.text_input("Tytuł filmu", placeholder="Wprowadź tytuł filmu")
     overview = st.text_area("Opis filmu", placeholder="Wprowadź szczegółowy opis filmu", height=68)
 
-    # Przygotowanie danych i modeli
+    # przygotowanie danych i modeli
     classification_df = movies_df[['original_title', 'overview', 'vote_category']]
     knn_model = clf.create_knn_model(classification_df)
     svm_model = clf.create_svm_model(classification_df)
 
-    # Wybór metody klasyfikacji
     classification_method = st.radio(
         "Wybierz metodę klasyfikacji:",
         ("KNN", "SVM")
     )
 
-    # Przycisk przewidywania kategorii ocen
+    # przycisk przewidywania kategorii ocen
     if st.button("Przewiduj kategorię oceny", key="predict_button"):
         if title and overview:
-            # Wywołanie odpowiedniej metody klasyfikacji
+
             if classification_method == "KNN":
                 predicted_category, nearest_neighbors_df = clf.classify_with_knn(knn_model, title, overview,
                                                                              classification_df)
 
-                # Wyświetlanie wyników dla KNN
+                # wyświetlanie wyników dla KNN
                 st.write(
                     f"Na podstawie 10 filmów najbardziej podobnych do tego, film najprawdopodobniej będzie **{predicted_category}**."
                 )
@@ -266,7 +264,7 @@ try:
                     use_container_width=True
                 )
 
-                # Wizualizacje: chmura słów i wykres słupkowy
+                # wizualizacje: chmura słów i wykres słupkowy
                 plot_1, plot_2 = st.columns(2)
 
                 with plot_1:
@@ -280,7 +278,7 @@ try:
             elif classification_method == "SVM":
                 predicted_category = clf.classify_with_svm(svm_model, title, overview)
 
-                # Wyświetlanie wyników dla SVM
+                # wyświetlanie wyników dla SVM
                 st.write(f"Film najprawdopodobniej będzie w kategorii **{predicted_category}**.")
         else:
             st.error("Proszę wypełnić wszystkie pola!")

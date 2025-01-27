@@ -40,11 +40,11 @@ def classify_with_knn(model, title, overview, classification_df):
     text = title + " " + overview
     vector = model.named_steps['tfidfvectorizer'].transform([text])
 
-    # Pobranie sąsiadów
+    # pobranie sąsiadów
     distances, indices = model.named_steps['kneighborsclassifier'].kneighbors(vector, return_distance=True)
     nearest_neighbors_df = classification_df.iloc[indices[0]].reset_index(drop=True)
 
-    # Mapowanie kategorii
+    # mapowanie kategorii
     category_mapping = {
         1: "bardzo zły",
         2: "zły",
@@ -55,7 +55,7 @@ def classify_with_knn(model, title, overview, classification_df):
     nearest_neighbors_df['vote_category'] = pd.to_numeric(nearest_neighbors_df['vote_category'], errors='coerce')
     nearest_neighbors_df['vote_category'] = nearest_neighbors_df['vote_category'].map(category_mapping).fillna("Nieznana kategoria")
 
-    # Predykcja na podstawie sąsiadów
+    # predykcja na podstawie sąsiadów
     predicted_category = nearest_neighbors_df['vote_category'].mode()[0]
     return predicted_category, nearest_neighbors_df
 
@@ -65,18 +65,14 @@ def classify_with_svm(model, title, overview):
     text = title + " " + overview
     vector = model.named_steps['tfidfvectorizer'].transform([text])
 
-    # Predykcja SVM
+    # predykcja SVM
     predicted_category = model.named_steps['linearsvc'].predict(vector)[0]
 
-    # Debugowanie - wyświetlenie surowej wartości zwróconej przez SVM
-    print(f"Predykcja zwrócona przez SVM (przed mapowaniem): {predicted_category}")
-    print(f"Typ danych predykcji: {type(predicted_category)}")
-
-    # Konwersja na int, jeśli jest to string
+    # konwersja na int, jeśli jest to string
     if isinstance(predicted_category, str):
         predicted_category = int(predicted_category)
 
-    # Mapowanie kategorii
+    # mapowanie kategorii
     category_mapping = {
         1: "bardzo zły",
         2: "zły",
